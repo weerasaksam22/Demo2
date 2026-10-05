@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AR Bicycle - Hiro Marker</title>
+
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.7/aframe/build/aframe-ar.min.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, "Noto Sans Thai", sans-serif;
+      background: #000;
+    }
+
+    .status {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      color: #fff;
+      background: rgba(0,0,0,.68);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 14px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .ui {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      z-index: 9999;
+      width: min(94vw, 740px);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(12, 20, 32, 0.82);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+
+    .ui button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      min-width: 100px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: #1677ff;
+      box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    }
+
+    .ui button.secondary {
+      background: #4b5563;
+    }
+
+    .ui button.success {
+      background: #16a34a;
+    }
+
+    .ui button.warning {
+      background: #f59e0b;
+      color: #111827;
+    }
+
+    .ui button:active {
+      transform: scale(.97);
+    }
+  </style>
+
+  <script>
+    let bikeSpeed = 0;        // degrees per second for wheel rotation
+    let passengerVisible = true;
+
+    AFRAME.registerComponent('bike-motion', {
+      tick: function (time) {
+        const t = time / 1000;
+
+        // ล้อจักรยาน
+        const frontWheel = document.getElementById('frontWheel');
+        const rearWheel = document.getElementById('rearWheel');
+
+        if (frontWheel) {
+          frontWheel.object3D.rotation.z -= THREE.MathUtils.degToRad(bikeSpeed) * (1 / 60);
+        }
+        if (rearWheel) {
+          rearWheel.object3D.rotation.z -= THREE.MathUtils.degToRad(bikeSpeed) * (1 / 60);
+        }
+
+        // จานปั่น
+        const crank = document.getElementById('crank');
+        if (crank) {
+          crank.object3D.rotation.z -= THREE.MathUtils.degToRad(bikeSpeed * 1.3) * (1 / 60);
+        }
+
+        // การแกว่งขาคนปั่น
+        const riderLeftThigh = document.getElementById('riderLeftThigh');
+        const riderRightThigh = document.getElementById('riderRightThigh');
+        const riderLeftCalf = document.getElementById('riderLeftCalf');
+        const riderRightCalf = document.getElementById('riderRightCalf');
+
+        const riderAmp = bikeSpeed === 0 ? 0.08 : Math.min(0.55, bikeSpeed / 700);
+        const riderFreq = Math.max(1.6, bikeSpeed / 90);
+
+        if (riderLeftThigh) riderLeftThigh.object3D.rotation.z = Math.sin(t * riderFreq) * riderAmp;
+        if (riderRightThigh) riderRightThigh.object3D.rotation.z = Math.sin(t * riderFreq + Math.PI) * riderAmp;
+        if (riderLeftCalf) riderLeftCalf.object3D.rotation.z = Math.cos(t * riderFreq) * (riderAmp * 0.85);
+        if (riderRightCalf) riderRightCalf.object3D.rotation.z = Math.cos(t * riderFreq + Math.PI) * (riderAmp * 0.85);
+
+        // คนซ้อนท้าย ขยับเล็กน้อยให้ดูมีชีวิต
+        const passengerGroup = document.getElementById('passengerGroup');
+        if (passengerGroup && passengerVisible) {
+          passengerGroup.object3D.position.y = 0.52 + Math.sin(t * 4) * 0.008;
+        }
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="status" id="statusText">ส่องกล้องไปที่ Hiro Marker</div>
+
+  <div class="ui">
+    <button class="secondary" onclick="setSpeed(0)">หยุด</button>
+    <button onclick="setSpeed(60)">ช้า</button>
+    <button onclick="setSpeed(180)">กลาง</button>
+    <button class="warning" onclick="setSpeed(320)">เร็ว</button>
+    <button class="success" onclick="togglePassenger()" id="passengerBtn">ปิดคนซ้อนท้าย</button>
+  </div>
+
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="antialias: true; alpha: true"
+    arjs="
+      sourceType: webcam;
+      debugUIEnabled: false;
+      detectionMode: mono;
+      patternRatio: 0.5;
+      trackingMethod: best;
+    "
+  >
+    <a-marker
+      id="hiroMarker"
+      preset="hiro"
+      emitevents="true"
+      smooth="true"
+      smoothCount="8"
+      smoothTolerance="0.01"
+      smoothThreshold="3"
+    >
+      <a-entity id="bikeRoot" bike-motion position="0 0 0" scale="0.75 0.75 0.75">
+        <!-- พื้น/เงาเล็กน้อย -->
+        <a-cylinder position="0 0.01 0" radius="0.95" height="0.01" color="#6b7280" opacity="0.22"></a-cylinder>
+
+        <!-- ล้อหลัง -->
+        <a-entity id="rearWheel" position="-0.50 0.28 0">
+          <a-torus radius="0.22" radius-tubular="0.025" rotation="90 0 0" color="#111827"></a-torus>
+          <a-cylinder radius="0.015" height="0.02" rotation="90 0 0" color="#9ca3af"></a-cylinder>
+          <a-box position="0 0.12 0" width="0.012" height="0.24" depth="0.012" color="#9ca3af"></a-box>
+          <a-box position="0.12 0 0" width="0.24" height="0.012" depth="0.012" color="#9ca3af"></a-box>
+          <a-box position="0 0 0" width="0.20" height="0.012" depth="0.012" rotation="0 0 45" color="#9ca3af"></a-box>
+          <a-box position="0 0 0" width="0.20" height="0.012" depth="0.012" rotation="0 0 -45" color="#9ca3af"></a-box>
+        </a-entity>
+
+        <!-- ล้อหน้า -->
+        <a-entity id="frontWheel" position="0.50 0.28 0">
+          <a-torus radius="0.22" radius-tubular="0.025" rotation="90 0 0" color="#111827"></a-torus>
+          <a-cylinder radius="0.015" height="0.02" rotation="90 0 0" color="#9ca3af"></a-cylinder>
+          <a-box position="0 0.12 0" width="0.012" height="0.24" depth="0.012" color="#9ca3af"></a-box>
+          <a-box position="0.12 0 0" width="0.24" height="0.012" depth="0.012" color="#9ca3af"></a-box>
+          <a-box position="0 0 0" width="0.20" height="0.012" depth="0.012" rotation="0 0 45" color="#9ca3af"></a-box>
+          <a-box position="0 0 0" width="0.20" height="0.012" depth="0.012" rotation="0 0 -45" color="#9ca3af"></a-box>
+        </a-entity>
+
+        <!-- เฟรมจักรยาน -->
+        <a-box position="-0.10 0.43 0" width="0.48" height="0.03" depth="0.03" rotation="0 0 25" color="#ef4444"></a-box>
+        <a-box position="0.10 0.43 0" width="0.42" height="0.03" depth="0.03" rotation="0 0 -24" color="#ef4444"></a-box>
+        <a-box position="-0.02 0.55 0" width="0.32" height="0.03" depth="0.03" rotation="0 0 68" color="#ef4444"></a-box>
+        <a-box position="-0.27 0.55 0" width="0.28" height="0.03" depth="0.03" rotation="0 0 -68" color="#ef4444"></a-box>
+        <a-box position="0.34 0.57 0" width="0.26" height="0.03" depth="0.03" rotation="0 0 68" color="#374151"></a-box>
+        <a-box position="0.56 0.69 0" width="0.18" height="0.03" depth="0.03" rotation="0 0 10" color="#374151"></a-box>
+
+        <!-- ตะเกียบหน้า -->
+        <a-box position="0.44 0.50 0" width="0.03" height="0.34" depth="0.03" rotation="0 0 18" color="#374151"></a-box>
+        <a-box position="0.53 0.49 0" width="0.03" height="0.34" depth="0.03" rotation="0 0 -8" color="#374151"></a-box>
+
+        <!-- เบาะหน้า -->
+        <a-box position="-0.14 0.67 0" width="0.18" height="0.03" depth="0.10" color="#111827"></a-box>
+        <a-box position="-0.16 0.58 0" width="0.02" height="0.18" depth="0.02" color="#6b7280"></a-box>
+
+        <!-- ที่ซ้อนท้าย -->
+        <a-box position="-0.39 0.60 0" width="0.18" height="0.02" depth="0.16" color="#6b7280"></a-box>
+        <a-box position="-0.34 0.49 0.06" width="0.02" height="0.22" depth="0.02" color="#6b7280"></a-box>
+        <a-box position="-0.44 0.49 -0.06" width="0.02" height="0.22" depth="0.02" color="#6b7280"></a-box>
+
+        <!-- แฮนด์ -->
+        <a-box position="0.62 0.74 0" width="0.18" height="0.02" depth="0.02" rotation="0 0 8" color="#111827"></a-box>
+        <a-box position="0.56 0.71 0" width="0.02" height="0.12" depth="0.02" rotation="0 0 15" color="#111827"></a-box>
+
+        <!-- ชุดปั่น -->
+        <a-entity id="crank" position="-0.03 0.34 0">
+          <a-cylinder radius="0.045" height="0.02" rotation="90 0 0" color="#111827"></a-cylinder>
+          <a-box position="0.11 0 0" width="0.22" height="0.015" depth="0.015" color="#4b5563"></a-box>
+          <a-box position="-0.11 0 0" width="0.22" height="0.015" depth="0.015" color="#4b5563"></a-box>
+          <a-box position="0.22 0.02 0" width="0.05" height="0.015" depth="0.10" color="#111827"></a-box>
+          <a-box position="-0.22 -0.02 0" width="0.05" height="0.015" depth="0.10" color="#111827"></a-box>
+        </a-entity>
+
+        <!-- คนปั่น -->
+        <a-entity id="riderGroup" position="-0.02 0.00 0">
+          <!-- ศีรษะ -->
+          <a-sphere position="-0.01 0.94 0" radius="0.09" color="#f2c29b"></a-sphere>
+          <!-- ลำตัว -->
+          <a-box position="0.00 0.77 0" width="0.18" height="0.24" depth="0.12" rotation="0 0 12" color="#2563eb"></a-box>
+
+          <!-- แขน -->
+          <a-box position="0.14 0.79 0" width="0.18" height="0.04" depth="0.04" rotation="0 0 -20" color="#f2c29b"></a-box>
+          <a-box position="-0.10 0.79 0" width="0.16" height="0.04" depth="0.04" rotation="0 0 42" color="#f2c29b"></a-box>
+
+          <!-- ขาซ้าย -->
+          <a-entity id="riderLeftThigh" position="-0.03 0.63 0">
+            <a-box position="0 -0.09 0" width="0.06" height="0.20" depth="0.06" color="#111827"></a-box>
+          </a-entity>
+          <a-entity id="riderLeftCalf" position="-0.04 0.45 0">
+            <a-box position="0 -0.09 0" width="0.055" height="0.19" depth="0.055" color="#1f2937"></a-box>
+          </a-entity>
+
+          <!-- ขาขวา -->
+          <a-entity id="riderRightThigh" position="0.05 0.63 0">
+            <a-box position="0 -0.09 0" width="0.06" height="0.20" depth="0.06" color="#111827"></a-box>
+          </a-entity>
+          <a-entity id="riderRightCalf" position="0.06 0.45 0">
+            <a-box position="0 -0.09 0" width="0.055" height="0.19" depth="0.055" color="#1f2937"></a-box>
+          </a-entity>
+        </a-entity>
+
+        <!-- คนซ้อนท้าย -->
+        <a-entity id="passengerGroup" position="-0.40 0.52 0">
+          <a-sphere position="0 0.32 0" radius="0.08" color="#f2c29b"></a-sphere>
+          <a-box position="0 0.16 0" width="0.16" height="0.20" depth="0.11" color="#16a34a"></a-box>
+          <a-box position="-0.04 0.01 0" width="0.05" height="0.16" depth="0.05" color="#374151"></a-box>
+          <a-box position="0.04 0.01 0" width="0.05" height="0.16" depth="0.05" color="#374151"></a-box>
+        </a-entity>
+      </a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    const marker = document.getElementById('hiroMarker');
+    const statusText = document.getElementById('statusText');
+    const passengerBtn = document.getElementById('passengerBtn');
+    const passengerGroup = document.getElementById('passengerGroup');
+
+    marker.addEventListener('markerFound', () => {
+      statusText.textContent = 'พบ Hiro Marker แล้ว';
+    });
+
+    marker.addEventListener('markerLost', () => {
+      statusText.textContent = 'ส่องกล้องไปที่ Hiro Marker';
+    });
+
+    function setSpeed(speed) {
+      bikeSpeed = speed;
+
+      if (speed === 0) {
+        statusText.textContent = 'จักรยานหยุด';
+      } else if (speed <= 60) {
+        statusText.textContent = 'ความเร็ว: ช้า';
+      } else if (speed <= 180) {
+        statusText.textContent = 'ความเร็ว: กลาง';
+      } else {
+        statusText.textContent = 'ความเร็ว: เร็ว';
+      }
+    }
+
+    function togglePassenger() {
+      passengerVisible = !passengerVisible;
+
+      if (passengerVisible) {
+        passengerGroup.setAttribute('visible', true);
+        passengerBtn.textContent = 'ปิดคนซ้อนท้าย';
+        statusText.textContent = 'แสดงคนซ้อนท้ายแล้ว';
+      } else {
+        passengerGroup.setAttribute('visible', false);
+        passengerBtn.textContent = 'เปิดคนซ้อนท้าย';
+        statusText.textContent = 'ซ่อนคนซ้อนท้ายแล้ว';
+      }
+    }
+  </script>
+</body>
+</html>
